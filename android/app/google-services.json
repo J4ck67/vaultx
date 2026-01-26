@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "829283785484",
+    "project_id": "vaultx-6ecd4",
+    "storage_bucket": "vaultx-6ecd4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:829283785484:android:1b4dfbb77680302acfc729",
+        "android_client_info": {
+          "package_name": "com.example.vaultx"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "829283785484-k94v402k1g7k12c6pev6vbqblouv7655.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.vaultx",
+            "certificate_hash": "893a78088483b9edb15956f98d8dee36a3c7a589"
+          }
+        },
+        {
+          "client_id": "829283785484-o9asf5unqilnbdq0q7l7ofa4egjscga5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyByusN3Q_j9Ew8-OZSCibM1ZLaln9GIPcY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "829283785484-o9asf5unqilnbdq0q7l7ofa4egjscga5.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "829283785484-tkg8csognao8gr0upp9qeeg7t41pfa53.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.vaultx"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

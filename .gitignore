@@ -1,0 +1,22 @@
+# Flutter
+build/
+.dart_tool/
+.packages
+.pub/
+.pub-cache/
+
+# Android
+android/.gradle
+android/app/build/
+android/build/
+
+# IDE
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Executables
+*.exe

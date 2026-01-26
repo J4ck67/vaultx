@@ -1,0 +1,13 @@
+[debug] [2026-01-08T04:01:36.643Z] ----------------------------------------------------------------------
+[debug] [2026-01-08T04:01:36.646Z] Command:       C:\Users\akash\STUDIO~1\vaultx\lib\firebase-tools-instant-win.exe C:\Users\akash\.cache\firebase\tools\lib\node_modules\firebase-tools\lib\bin\firebase projects:list --json
+[debug] [2026-01-08T04:01:36.646Z] CLI Version:   15.1.0
+[debug] [2026-01-08T04:01:36.646Z] Platform:      win32
+[debug] [2026-01-08T04:01:36.646Z] Node Version:  v20.18.2
+[debug] [2026-01-08T04:01:36.646Z] Time:          Thu Jan 08 2026 09:31:36 GMT+0530 (India Standard Time)
+[debug] [2026-01-08T04:01:36.646Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-01-08T04:01:36.653Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-01-08T04:01:36.653Z] > authorizing via signed-in user (akashrajendran835@gmail.com)
+[debug] [2026-01-08T04:01:36.656Z] Checked if tokens are valid: true, expires at: 1767847146134
+[debug] [2026-01-08T04:01:36.656Z] Checked if tokens are valid: true, expires at: 1767847146134
+[debug] [2026-01-08T04:01:36.657Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects pageSize=1000
