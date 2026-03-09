@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:vaultx/screens/document_preview_screen.dart';
 import 'package:vaultx/screens/profile.dart';
+import 'package:vaultx/screens/stats_screen.dart';
+import 'package:vaultx/screens/vault_screen.dart';
 import '../widgets/bottom_nav.dart';
 import 'home_screen.dart';
 
@@ -14,21 +15,28 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int index = 0;
 
+  // 🔴 MATCHES THE 4 BUTTONS IN THE NAV BAR
   final pages = const [
     HomeScreen(),
-    Center(child: Text("Vault")),
-    Center(child: Text("Scan")),
-    Center(child: Text("Activity")),
+    VaultScreen(),
+    StatsScreen(),
     ProfileScreen(),
-    Center(child: Text("Profile")),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: pages[index],
+      extendBody: true, // Required for the floating glass effect
+      backgroundColor: Colors.white,
+
+      body: IndexedStack(
+        index: index,
+        children: pages,
+      ),
+
       bottomNavigationBar: VaultXBottomNav(
         currentIndex: index,
+        // 🔴 NORMAL TAB SWITCHING (No more intercepting)
         onTap: (i) => setState(() => index = i),
       ),
     );

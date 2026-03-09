@@ -2,12 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:vaultx/screens/onboarding_screen.dart';
 import 'package:vaultx/screens/otp_screen.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:vaultx/services/auth_service.dart';
-
-
 import '../core/snacksbar.dart';
-
+import 'app_shell.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -96,11 +93,9 @@ class LoginScreen extends StatelessWidget {
 
                 const Spacer(),
 
-
-
                 const SizedBox(height: 12),
 
-                /// GOOGLE (with logo)
+                /// GOOGLE LOGIN
                 _LoginButton(
                   label: "Continue with Google",
                   imageAsset: 'assets/icon/google.png',
@@ -111,36 +106,59 @@ class LoginScreen extends StatelessWidget {
                     try {
                       final user = await AuthService.instance.signInWithGoogle();
 
-
                       if (user == null) {
                         showAnimatedSnackBar(
                           context,
                           message: "Login cancelled",
                           icon: Icons.close,
-                        );return;
-                      }await FirebaseFirestore.instance
-                          .collection('test')
-                          .add({
-                        'status': 'firestore enabled',
-                        'uid': user.uid,
-                        'timestamp': FieldValue.serverTimestamp(),
-                      });
-                    } catch (e) {
+                        );
+                        return;
+                      }
+
+                      // 1. Show immediate success feedback
                       showAnimatedSnackBar(
                         context,
-                        message: "Google login failed",
+                        message: "welcome to VaultX....",
+                        icon: Icons.check_circle,
+                      );
+
+                      // 2. Background Firestore update (Non-blocking)
+                      FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(user.uid)
+                          .set({
+                        'status': 'active',
+                        'lastLogin': FieldValue.serverTimestamp(),
+                        'email': user.email,
+                        'name': user.displayName,
+                      }, SetOptions(merge: true)).catchError((e) {
+                        debugPrint("Firestore write failed: $e");
+                      });
+
+                      if (!context.mounted) return;
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(builder: (context) => const AppShell()),
+                            (route) => false, // This completely clears the back-history!
+                      );
+                      //
+
+                      // Note: Navigation happens automatically via main.dart StreamBuilder
+
+                    } catch (e) {
+                      debugPrint("Login Error: $e");
+                      showAnimatedSnackBar(
+                        context,
+                        message: "Google login failed. Please try again.",
                         icon: Icons.error_outline,
                       );
                     }
                   },
-
-
                 ),
-
 
                 const SizedBox(height: 12),
 
-                /// PHONE (with phone icon image)
+                /// PHONE LOGIN
                 _LoginButton(
                   label: "Use mobile number",
                   imageAsset: 'assets/icon/phone.png',
@@ -148,13 +166,16 @@ class LoginScreen extends StatelessWidget {
                   textColor: Colors.black,
                   border: true,
                   onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const PhoneInputScreen()));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const PhoneInputScreen()),
+                    );
                   },
                 ),
 
-
                 const SizedBox(height: 24),
 
+                /// FOOTER LINKS
                 Center(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -165,7 +186,6 @@ class LoginScreen extends StatelessWidget {
                       ),
                       GestureDetector(
                         onTap: () {
-                          // 👉 Navigate to Signup screen (create later)
                           showAnimatedSnackBar(
                             context,
                             message: "Signup coming soon",
@@ -184,17 +204,14 @@ class LoginScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+
                 const SizedBox(height: 12),
-                /// TERMS
+
                 const Text(
                   textAlign: TextAlign.center,
-                  "By signing up, you agree to our Terms."
+                  "By signing up, you agree to our Terms.\n"
                       "See how we use your data in our Privacy Policy.",
-
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.black54,
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
                 ),
 
                 const SizedBox(height: 20),
@@ -208,11 +225,11 @@ class LoginScreen extends StatelessWidget {
 }
 
 /// ------------------------------------------------
-/// LOGIN BUTTON (Reusable)
+/// LOGIN BUTTON (Reusable Component)
 /// ------------------------------------------------
 class _LoginButton extends StatelessWidget {
   final String label;
-  final String? imageAsset; // 👈 NEW
+  final String? imageAsset;
   final IconData? icon;
   final Color background;
   final Color textColor;
@@ -241,24 +258,17 @@ class _LoginButton extends StatelessWidget {
           backgroundColor: background,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: border
-                ? const BorderSide(color: Colors.black12)
-                : BorderSide.none,
+            side: border ? const BorderSide(color: Colors.black12) : BorderSide.none,
           ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (imageAsset != null)
-              Image.asset(
-                imageAsset!,
-                height: 22,
-              )
+              Image.asset(imageAsset!, height: 22)
             else if (icon != null)
               Icon(icon, color: textColor),
-
             const SizedBox(width: 12),
-
             Text(
               label,
               style: TextStyle(
@@ -273,13 +283,3 @@ class _LoginButton extends StatelessWidget {
     );
   }
 }
-void _showError(BuildContext context, String message) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      behavior: SnackBarBehavior.floating,
-      content: Text(message),
-    ),
-  );
-}
-
-

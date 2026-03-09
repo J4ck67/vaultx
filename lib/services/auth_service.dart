@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:googleapis/gmail/v1.dart'; // 👈 NEW IMPORT
+import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart'; // 👈 NEW IMPORT
 
 class AuthService {
   AuthService._();
@@ -7,31 +9,65 @@ class AuthService {
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // ───────── GOOGLE ─────────
-  GoogleSignIn _google() => GoogleSignIn(
-    scopes: ['email', 'profile'],
+  // Keep one instance of GoogleSignIn
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    // 🔴 IMPORTANT: We added the Gmail scope here.
+    // This allows the app to ask for "Read-only" permission to emails.
+    scopes: [
+      'email',
+      'profile',
+      GmailApi.gmailReadonlyScope,
+    ],
   );
 
+  // ───────── GOOGLE LOGIN ─────────
   Future<User?> signInWithGoogle() async {
-    final googleSignIn = _google();
-
     try {
-      await googleSignIn.signOut();
-      await googleSignIn.disconnect();
-    } catch (_) {}
+      // 1. Sign out of existing session to ensure account picker shows up
+      await _googleSignIn.signOut();
 
-    final googleUser = await googleSignIn.signIn();
-    if (googleUser == null) return null;
+      final googleUser = await _googleSignIn.signIn();
 
-    final googleAuth = await googleUser.authentication;
+      if (googleUser == null) {
+        // User simply closed the popup
+        return null;
+      }
 
-    final credential = GoogleAuthProvider.credential(
-      idToken: googleAuth.idToken,
-      accessToken: googleAuth.accessToken,
-    );
+      final googleAuth = await googleUser.authentication;
 
-    final result = await _auth.signInWithCredential(credential);
-    return result.user;
+      final credential = GoogleAuthProvider.credential(
+        idToken: googleAuth.idToken,
+        accessToken: googleAuth.accessToken,
+      );
+
+      // 2. Sign in to Firebase
+      final result = await _auth.signInWithCredential(credential);
+      return result.user;
+    } catch (e) {
+      print("Google Sign-In Error: $e");
+      return null;
+    }
+  }
+
+  // ───────── GMAIL API CLIENT ─────────
+  // 🔵 NEW: This method is called by your GmailService to get access
+  Future<GmailApi?> getGmailApiClient() async {
+    try {
+      // Ensure user is signed in (silently check first)
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signInSilently() ?? await _googleSignIn.signIn();
+
+      if (googleUser == null) return null;
+
+      // Create an authenticated HTTP client for Gmail API
+      final httpClient = await _googleSignIn.authenticatedClient();
+
+      if (httpClient == null) return null;
+
+      return GmailApi(httpClient);
+    } catch (e) {
+      print("Gmail API Client Error: $e");
+      return null;
+    }
   }
 
   // ───────── PHONE OTP STATE ─────────
@@ -56,33 +92,26 @@ class AuthService {
         phoneNumber: phoneNumber,
         timeout: const Duration(seconds: 60),
         forceResendingToken: _resendToken,
-
-        // ❌ DO NOT AUTO LOGIN
         verificationCompleted: (_) {},
-
         verificationFailed: (FirebaseAuthException e) {
           onError(e.message ?? "OTP verification failed");
         },
-
         codeSent: (String verificationId, int? resendToken) {
           _verificationId = verificationId;
           _resendToken = resendToken;
           onCodeSent(verificationId);
         },
-
         codeAutoRetrievalTimeout: (String verificationId) {
           _verificationId = verificationId;
         },
       );
-    } catch (_) {
-      onError("OTP request failed");
+    } catch (e) {
+      onError("OTP request failed: $e");
     }
   }
 
   // ───────── VERIFY OTP ─────────
-  Future<User?> verifyOtp({
-    required String smsCode,
-  }) async {
+  Future<User?> verifyOtp({required String smsCode}) async {
     final credential = PhoneAuthProvider.credential(
       verificationId: verificationId,
       smsCode: smsCode,
@@ -95,10 +124,10 @@ class AuthService {
   // ───────── LOGOUT ─────────
   Future<void> logout() async {
     try {
-      await _google().signOut();
-      await _google().disconnect();
-    } catch (_) {}
-
-    await _auth.signOut();
+      await _googleSignIn.signOut();
+      await _auth.signOut();
+    } catch (e) {
+      print("Logout Error: $e");
+    }
   }
 }

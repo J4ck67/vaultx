@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
- import 'bills/kseb_receipt_parser.dart'; //
+ import '../services/bills/kseb_receipt_parser.dart'; //
 
 class FileUploadService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
