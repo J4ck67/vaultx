@@ -1,142 +1,207 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:syncfusion_flutter_pdf/pdf.dart';
+import 'package:image/image.dart' as img;
 
 class OcrService {
+  /// 🔑 Replace with your Google Vision API key
+  static const String apiKey = "AIzaSyDddMaJ2BemsOUZA0cTDXVjSeJD-011eJU";
 
-  // 🔑 Paste your NEW Google Cloud API Key here
-  static const String _visionApiKey = 'AIzaSyBZKZ_p9Rj7YtIcyeO5JJZW-9YajXbIT1E';
-  static const String _visionApiUrl = 'https://vision.googleapis.com/v1/images:annotate?key=$_visionApiKey';
+  static String get apiUrl =>
+      "https://vision.googleapis.com/v1/images:annotate?key=$apiKey";
 
-  /// Extracts all text from either an Image (via Cloud Vision) or a PDF
+  /*──────────────── OCR ENTRY ────────────────*/
+
   static Future<String> extractText(File file) async {
-    try {
-      final path = file.path.toLowerCase();
+    final processedImage = await _preprocessImage(file);
 
-      // ──────── 1. HANDLE PDF DOCUMENTS (Local Extraction) ────────
-      if (path.endsWith('.pdf')) {
-        final PdfDocument document = PdfDocument(inputBytes: await file.readAsBytes());
-        String text = PdfTextExtractor(document).extractText();
-        document.dispose();
+    final bytes = await processedImage.readAsBytes();
 
-        debugPrint("📄 PDF Text Extracted: ${text.length} characters");
-        return text;
-      }
-      // ──────── 2. HANDLE IMAGES (Cloud Vision API) ────────
-      else if (path.endsWith('.jpg') || path.endsWith('.jpeg') || path.endsWith('.png')) {
-        return await _analyzeImageWithCloudVision(file);
-      }
+    final base64Image = base64Encode(bytes);
 
-      return "";
-    } catch (e) {
-      debugPrint("❌ OCR Error: $e");
-      return "";
+    final requestBody = jsonEncode({
+      "requests": [
+        {
+          "image": {"content": base64Image},
+          "features": [
+            {"type": "DOCUMENT_TEXT_DETECTION"},
+          ],
+        },
+      ],
+    });
+
+    final response = await http.post(
+      Uri.parse(apiUrl),
+      headers: {"Content-Type": "application/json"},
+      body: requestBody,
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception("Vision API error ${response.statusCode}");
     }
+
+    final data = jsonDecode(response.body);
+
+    return data["responses"][0]["fullTextAnnotation"]?["text"] ?? "";
   }
 
-  /// ☁️ SENDS IMAGE TO GOOGLE CLOUD VISION API
-  static Future<String> _analyzeImageWithCloudVision(File imageFile) async {
-    try {
-      List<int> imageBytes = await imageFile.readAsBytes();
-      String base64Image = base64Encode(imageBytes);
+  /*──────────────── IMAGE PREPROCESSING ────────────────*/
 
-      Map<String, dynamic> requestPayload = {
-        "requests": [
-          {
-            "image": {
-              "content": base64Image
-            },
-            "features": [
-              {
-                "type": "DOCUMENT_TEXT_DETECTION"
-              }
-            ]
-          }
-        ]
-      };
+  static Future<File> _preprocessImage(File file) async {
+    final bytes = await file.readAsBytes();
 
-      final response = await http.post(
-        Uri.parse(_visionApiUrl),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode(requestPayload),
-      );
+    // To prevent out of memory issues, decode only to check size if needed,
+    // but the Vision API handles large files reasonably well if they are < 20MB.
+    // For now, we will just send the raw image bytes to avoid quality loss.
 
-      // 🟢 DEBUG: PRINT THE RAW RESPONSE TO THE CONSOLE
-      debugPrint("====== 🔍 RAW CLOUD VISION RESPONSE ======");
-      debugPrint(response.body);
-      debugPrint("==========================================");
+    // Check if the image size is too large for base64 encoding (e.g. > 4MB)
+    // Vision API limit is 20MB, but base64 inflates it.
+    if (bytes.length > 5 * 1024 * 1024) {
+      final decoded = img.decodeImage(bytes);
+      if (decoded != null) {
+        // Only resize if it's huge
+        final processed = img.copyResize(decoded, width: 2000);
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        final newFile = File(
+          "${file.parent.path}/ocr_${DateTime.now().millisecondsSinceEpoch}.jpg",
+        );
 
-        if (responseData['responses'] != null &&
-            responseData['responses'][0]['textAnnotations'] != null) {
-
-          String extractedText = responseData['responses'][0]['textAnnotations'][0]['description'];
-
-          debugPrint("☁️ Cloud Vision Extracted: \n$extractedText");
-          return extractedText;
-        } else {
-          debugPrint("☁️ Cloud Vision found no text in this image.");
-          return "";
-        }
-      } else {
-        debugPrint("☁️ Cloud Vision API Error: ${response.statusCode} - ${response.body}");
-        return "";
+        await newFile.writeAsBytes(img.encodeJpg(processed, quality: 85));
+        return newFile;
       }
-    } catch (e) {
-      debugPrint("☁️ Cloud Vision Request Failed: $e");
-      return "";
     }
+
+    // Otherwise, return original file without quality loss
+    return file;
   }
 
-  /// 🧠 SMART AMOUNT DETECTOR
-  static double guessAmount(String rawText) {
-    if (rawText.isEmpty) return 0.0;
+  /*──────────────── SMART AMOUNT DETECTOR ────────────────*/
 
-    String text = rawText.toLowerCase().replaceAll(RegExp(r',(?=\d{3})'), '');
-    RegExp amountRegex = RegExp(r'\b\d+(\.\d{1,2})?\b');
-    List<String> keywords = [' grand total', 'amount due', 'amount','total amount', 'pay', 'due', '₹', 'rs', 'inr'];
+  static double guessAmount(String text) {
+    if (text.isEmpty) return 0;
 
-    List<double> foundAmounts = [];
+    // Normalize spacing and newlines for easier scanning
+    String normalizedText = text.toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+
+    // Ordered by highest confidence
+    List<String> keywords = [
+      "അടയ്ക്കേണ്ട തുക", // Malayalam
+      "grand total",
+      "total amount due",
+      "amount due",
+      "net amount",
+      "payable",
+      "total amount",
+      "total",
+      "balance",
+      "amount",
+    ];
+
+    // Regex to find numbers: catches optional Rs/₹/INR prefix, optional spaces, commas, decimals.
+    // E.g., captures "rs. 1,234.50" or "₹ 1234"
+    // Negative lookahead (?!\s*%) explicitly ensures the number is NOT followed by a percentage sign.
+    RegExp numberRegex = RegExp(
+      r'(?:rs\.?|inr|₹)?\s*\b(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)\b(?!\s*%)',
+    );
 
     for (String keyword in keywords) {
-      int index = text.indexOf(keyword);
+      // Find all occurrences of the keyword
+      int index = normalizedText.lastIndexOf(keyword);
       if (index != -1) {
-        String substring = text.substring(index, (index + 30).clamp(0, text.length));
-        final match = amountRegex.firstMatch(substring);
+        // Look ahead 50 characters, tightly bounding to the keyword
+        String nearby = normalizedText.substring(
+          index + keyword.length,
+          (index + keyword.length + 50).clamp(0, normalizedText.length),
+        );
 
+        final match = numberRegex.firstMatch(nearby);
         if (match != null) {
-          double? amount = double.tryParse(match.group(0)!);
-          if (amount != null && amount > 0) {
-            foundAmounts.add(amount);
+          // match.group(1) is safely just the digits, ignoring 'rs' or '₹'
+          String cleanNumber = match.group(1)!.replaceAll(",", "");
+          double? value = double.tryParse(cleanNumber);
+
+          // We return the very first valid amount found next to our highest priority keyword
+          if (value != null && value > 0 && value < 100000) {
+            return value;
           }
         }
       }
     }
 
-    if (foundAmounts.isNotEmpty) {
-      foundAmounts.sort();
-      return foundAmounts.last;
+    // Fallback: if no keywords worked, just find the largest monetary-looking number in the bottom half of the bill
+    int halfLength = (normalizedText.length / 2).floor();
+    String bottomHalf = normalizedText.substring(halfLength);
+
+    final matches = numberRegex.allMatches(bottomHalf);
+
+    List<double> allNumbers = [];
+    for (final match in matches) {
+      String cleanNumber = match.group(1)!.replaceAll(",", "");
+      double? value = double.tryParse(cleanNumber);
+      // More restrictive bound to avoid huge IDs or meter counts
+      if (value != null && value > 10 && value < 50000) {
+        allNumbers.add(value);
+      }
     }
 
-    return 0.0;
+    if (allNumbers.isNotEmpty) {
+      // Sort and take the absolute highest
+      allNumbers.sort();
+      return allNumbers.last;
+    }
+
+    return 0;
   }
 
-  /// 📅 SMART DATE DETECTOR (NEW)
-  static String? guessDate(String rawText) {
-    if (rawText.isEmpty) return null;
+  /*──────────────── DATE DETECTOR ────────────────*/
 
-    // Matches standard formats like 12/04/2024, 15-Oct-2024
-    final dateRegex = RegExp(r'\b(\d{1,2}[-/\s](?:[a-zA-Z]{3,4}|\d{1,2})[-/\s]\d{2,4})\b');
-    final matches = dateRegex.allMatches(rawText);
+  static String? guessDate(String text) {
+    if (text.isEmpty) return null;
 
-    if (matches.isNotEmpty) {
-      return matches.last.group(1);
+    // Normalize spacing and newlines
+    String normalizedText = text.toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+
+    List<String> keywords = [
+      "disconnection date",
+      "disconnect date", // Disconnection date in Malayalam
+      "വിച്ഛേദന ",
+      "due date",
+      "last date without fine",
+      "last date",
+      "pay by",
+      "പിഴ  ",
+      "due by",
+      "payable before",
+      "date",
+    ];
+
+    // Improved date regex: supports DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
+    // Also supports short years (DD/MM/YY) and Month names (DD MMM YYYY) roughly
+    RegExp dateRegex = RegExp(r'\b\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}\b');
+
+    // Trying to find date near a due date keyword
+    for (String keyword in keywords) {
+      int index = normalizedText.lastIndexOf(keyword);
+      if (index != -1) {
+        // Broaden search radius
+        String nearby = normalizedText.substring(
+          index,
+          (index + 80).clamp(0, normalizedText.length),
+        );
+
+        // Find ALL dates near keyword, to grab the LAST FINAL date, we take the last matched date near the last matched keyword.
+        final matches = dateRegex.allMatches(nearby);
+        if (matches.isNotEmpty) {
+          return matches.last.group(0);
+        }
+      }
     }
 
-    return null;
+    final matches = dateRegex.allMatches(normalizedText);
+
+    if (matches.isEmpty) return null;
+
+    // Usually the last date on a bill is the payment/due date, but occasionally it's generated date.
+    return matches.last.group(0);
   }
 }

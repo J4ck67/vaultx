@@ -1,12 +1,12 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:vaultx/screens/profile.dart';
-import '../services/file_view_service.dart';
 import '../services/gmail_service.dart';
+import '../services/file_view_service.dart';
 import '../widgets/upload_bill.dart';
+import '../services/notification_service.dart';
 import 'document_preview_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -42,7 +42,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (bills.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("No PDF bills found in Gmail.")));
+            const SnackBar(content: Text("No PDF bills found in Gmail.")),
+          );
         }
         setState(() => isScanning = false);
         return;
@@ -53,7 +54,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // Process all bills in parallel
       List<Future<void>> uploadTasks = bills.map((bill) async {
-
         // 🔴 1. DUPLICATE CHECK: Use the Gmail ID as the Firestore Doc ID
         final docRef = FirebaseFirestore.instance
             .collection('users')
@@ -72,13 +72,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // Use the Gmail ID in the file name to prevent Storage overwrites too
         final String fileName = "${bill.id}_${bill.filename}";
-        final storageRef = FirebaseStorage.instance
-            .ref()
-            .child('uploads/${user.uid}/$detectedCategory/$fileName');
+        final storageRef = FirebaseStorage.instance.ref().child(
+          'uploads/${user.uid}/$detectedCategory/$fileName',
+        );
 
         final uploadTask = await storageRef.putData(
-            bill.fileBytes,
-            SettableMetadata(contentType: 'application/pdf')
+          bill.fileBytes,
+          SettableMetadata(contentType: 'application/pdf'),
         );
 
         final downloadUrl = await uploadTask.ref.getDownloadURL();
@@ -111,14 +111,15 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(addedCount > 0
+            content: Text(
+              addedCount > 0
                   ? "🚀 Imported $addedCount new bills!"
-                  : "✔️ Everything is up to date (No new bills)."),
-              backgroundColor: addedCount > 0 ? Colors.green : Colors.blueAccent
+                  : "✔️ Everything is up to date (No new bills).",
+            ),
+            backgroundColor: addedCount > 0 ? Colors.green : Colors.blueAccent,
           ),
         );
       }
-
     } catch (e) {
       debugPrint("Scan Error: $e");
       if (mounted) {
@@ -134,11 +135,21 @@ class _HomeScreenState extends State<HomeScreen> {
   // 🧠 SMART CATEGORIZER
   String _detectCategory(String subject) {
     final s = subject.toLowerCase();
-    if (s.contains('Insurance') || s.contains('policy') || s.contains('premium')) return "Insurance";
-    if (s.contains('subscription') || s.contains('tickets') || s.contains('your tickets') || s.contains('prime')) return "Subscription";
-    if (s.contains('electricity') || s.contains('power') || s.contains('bill')) return "Electricity";
-    if (s.contains('e-account') || s.contains('banking') || s.contains('rent')) return "Rent";
-    if (s.contains('internet') || s.contains('wifi') || s.contains('broadband')) return "Internet";
+    if (s.contains('Insurance') ||
+        s.contains('policy') ||
+        s.contains('premium'))
+      return "Insurance";
+    if (s.contains('subscription') ||
+        s.contains('tickets') ||
+        s.contains('your tickets') ||
+        s.contains('prime'))
+      return "Subscription";
+    if (s.contains('electricity') || s.contains('power') || s.contains('bill'))
+      return "Electricity";
+    if (s.contains('e-account') || s.contains('banking') || s.contains('rent'))
+      return "Rent";
+    if (s.contains('internet') || s.contains('wifi') || s.contains('broadband'))
+      return "Internet";
     return "Other";
   }
 
@@ -172,26 +183,54 @@ class _HomeScreenState extends State<HomeScreen> {
                 /*──────── 1. HEADER ────────*/
                 Row(
                   children: [
-                    const Icon(Icons.security_sharp, color: Colors.black, size: 28),
+                    const Icon(
+                      Icons.security_sharp,
+                      color: Colors.black,
+                      size: 28,
+                    ),
                     const SizedBox(width: 8),
                     const Text(
                       "Vault",
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const Text(
                       "X",
                       style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blueAccent),
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blueAccent,
+                      ),
                     ),
                     const Spacer(),
+
+                    // 🟢 DEMO NOTIFICATION BUTTON
+                    IconButton(
+                      icon: const Icon(Icons.notifications_active_rounded, color: Colors.black),
+                      tooltip: "Test Push Notification",
+                      onPressed: () {
+                        NotificationService().showInstantNotification(
+                          id: 999,
+                          title: "Demo Alert: Electricity Bill Due!",
+                          body: "Your Adani Electricity bill of ₹1,450 is expiring soon. Pay now to avoid late fees.",
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Test Notification triggered!")),
+                        );
+                      },
+                    ),
 
                     // GMAIL SYNC BUTTON
                     if (isScanning)
                       const SizedBox(
-                        width: 20, height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.black,
+                        ),
                       )
                     else
                       IconButton(
@@ -207,7 +246,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (_) => const ProfileScreen()),
+                            builder: (_) => const ProfileScreen(),
+                          ),
                         );
                       },
                       child: Container(
@@ -223,8 +263,11 @@ class _HomeScreenState extends State<HomeScreen> {
                               ? NetworkImage(user.photoURL!)
                               : null,
                           child: user.photoURL == null
-                              ? const Icon(Icons.person,
-                              size: 18, color: Colors.white)
+                              ? const Icon(
+                                  Icons.person,
+                                  size: 18,
+                                  color: Colors.white,
+                                )
                               : null,
                         ),
                       ),
@@ -273,15 +316,20 @@ class _HomeScreenState extends State<HomeScreen> {
                               const SizedBox(height: 4),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 4),
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.amber,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: const Row(
                                   children: [
-                                    Icon(Icons.lock,
-                                        size: 12, color: Colors.black),
+                                    Icon(
+                                      Icons.lock,
+                                      size: 12,
+                                      color: Colors.black,
+                                    ),
                                     SizedBox(width: 4),
                                     Text(
                                       "Vault Secured",
@@ -296,8 +344,11 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ],
                           ),
-                          const Icon(Icons.shield,
-                              color: Colors.white24, size: 40),
+                          const Icon(
+                            Icons.shield,
+                            color: Colors.white24,
+                            size: 40,
+                          ),
                         ],
                       ),
                       const SizedBox(height: 20),
@@ -330,8 +381,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: const [
                     Text(
                       "Upcoming Bills",
-                      style:
-                      TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
                   ],
@@ -342,14 +395,29 @@ class _HomeScreenState extends State<HomeScreen> {
                   physics: const BouncingScrollPhysics(),
                   child: Row(
                     children: [
-                      _buildUpcomingBillCard("Rent", "₹8,500", "2 days left",
-                          Icons.home, true),
+                      _buildUpcomingBillCard(
+                        "Rent",
+                        "₹8,500",
+                        "2 days left",
+                        Icons.home,
+                        true,
+                      ),
                       const SizedBox(width: 12),
-                      _buildUpcomingBillCard("Internet", "₹1,200", "5 days left",
-                          Icons.wifi, false),
+                      _buildUpcomingBillCard(
+                        "Internet",
+                        "₹1,200",
+                        "5 days left",
+                        Icons.wifi,
+                        false,
+                      ),
                       const SizedBox(width: 12),
-                      _buildUpcomingBillCard("Power", "₹2,400", "12 days left",
-                          Icons.bolt, false),
+                      _buildUpcomingBillCard(
+                        "Power",
+                        "₹2,400",
+                        "12 days left",
+                        Icons.bolt,
+                        false,
+                      ),
                     ],
                   ),
                 ),
@@ -374,12 +442,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(20),
                             color: selected ? Colors.black : Colors.white,
                             border: Border.all(
-                                color: selected ? Colors.black : Colors.black12),
+                              color: selected ? Colors.black : Colors.black12,
+                            ),
                           ),
                           child: Text(
                             c,
@@ -424,8 +495,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         child: Column(
                           children: [
-                            Icon(Icons.folder_open,
-                                size: 40, color: Colors.grey[300]),
+                            Icon(
+                              Icons.folder_open,
+                              size: 40,
+                              color: Colors.grey[300],
+                            ),
                             const SizedBox(height: 10),
                             Text(
                               "No $selectedCategory documents",
@@ -449,7 +523,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
 
-                const SizedBox(height: 120), // 🟢 Increased spacing at the bottom so documents aren't hidden
+                const SizedBox(
+                  height: 120,
+                ), // 🟢 Increased spacing at the bottom so documents aren't hidden
               ],
             ),
           ),
@@ -460,8 +536,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ──────── HELPER WIDGETS ────────
 
-  Widget _buildUpcomingBillCard(String title, String amount, String days,
-      IconData icon, bool isUrgent) {
+  Widget _buildUpcomingBillCard(
+    String title,
+    String amount,
+    String days,
+    IconData icon,
+    bool isUrgent,
+  ) {
     return Container(
       width: 140,
       padding: const EdgeInsets.all(16),
@@ -487,8 +568,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   : Colors.grey[100],
               shape: BoxShape.circle,
             ),
-            child: Icon(icon,
-                size: 20, color: isUrgent ? Colors.white : Colors.black),
+            child: Icon(
+              icon,
+              size: 20,
+              color: isUrgent ? Colors.white : Colors.black,
+            ),
           ),
           const SizedBox(height: 12),
           Text(
@@ -553,23 +637,26 @@ class _HomeScreenState extends State<HomeScreen> {
         if (storagePath == null || originalName == null) return;
 
         showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (_) => const Center(child: CircularProgressIndicator()));
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const Center(child: CircularProgressIndicator()),
+        );
 
         try {
           // 🚀 UPDATED: USING downloadFile (No Decryption)
           final file = await FileViewService.downloadFile(
-              storagePath: storagePath,
-              originalName: originalName
+            storagePath: storagePath,
+            originalName: originalName,
           );
 
           if (!mounted) return;
           Navigator.pop(context);
           Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => DocumentPreviewScreen(file: file)));
+            context,
+            MaterialPageRoute(
+              builder: (_) => DocumentPreviewScreen(file: file),
+            ),
+          );
         } catch (e) {
           debugPrint("❌ Open Error: $e"); // View this in your Debug Console
           if (mounted) {
@@ -592,9 +679,10 @@ class _HomeScreenState extends State<HomeScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 2)),
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
           ],
         ),
         child: Row(
@@ -615,7 +703,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                     data['originalName'] ?? 'Document',
                     style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 14),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -625,16 +715,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       if (data['biller'] != null)
                         Text(
                           "${data['biller']} • ",
-                          style:
-                          TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
                         ),
                       Text(
                         formattedDueDate ?? "No due date",
                         style: TextStyle(
-                            fontSize: 12,
-                            color: formattedDueDate != null
-                                ? Colors.redAccent
-                                : Colors.grey),
+                          fontSize: 12,
+                          color: formattedDueDate != null
+                              ? Colors.redAccent
+                              : Colors.grey,
+                        ),
                       ),
                     ],
                   ),
@@ -644,8 +737,10 @@ class _HomeScreenState extends State<HomeScreen> {
             if (amount != null && amount > 0)
               Text(
                 "₹${amount.toStringAsFixed(0)}",
-                style:
-                const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
           ],
         ),
@@ -689,7 +784,8 @@ class _UploadButton extends StatelessWidget {
               MaterialPageRoute(builder: (_) => const UploadBillButton()),
             );
           },
-          backgroundColor: Colors.transparent, // Ensures the gradient shows through
+          backgroundColor:
+              Colors.transparent, // Ensures the gradient shows through
           elevation: 0, // Handled by our Container's shadow instead
           highlightElevation: 0,
           child: const Icon(

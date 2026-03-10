@@ -103,6 +103,69 @@ class GmailService {
     }
     return null;
   }
+
+  // ──────── 🟢 NEW: FETCH RAW EMAIL TEXT FOR ALERTS ────────
+  Future<List<GmailTextAlert>> fetchTextAlerts() async {
+    final gmailApi = await AuthService.instance.getGmailApiClient();
+    if (gmailApi == null) return [];
+
+    String query = 'recharge OR expiring OR reminder OR policy OR autopay newer_than:30d';
+    List<GmailTextAlert> alerts = [];
+
+    try {
+      print("🔍 Searching Gmail Text Alerts with query: $query");
+      final response = await gmailApi.users.messages.list('me', q: query, maxResults: 15);
+
+      if (response.messages == null || response.messages!.isEmpty) return [];
+
+      for (var msg in response.messages!) {
+        final fullMessage = await gmailApi.users.messages.get('me', msg.id!);
+        
+        String subject = "Alert";
+        fullMessage.payload?.headers?.forEach((header) {
+          if (header.name == 'Subject') subject = header.value ?? "Alert";
+        });
+
+        String snippet = fullMessage.snippet ?? "";
+        
+        if (snippet.isNotEmpty && (snippet.toLowerCase().contains("recharge") || 
+                                   snippet.toLowerCase().contains("due") || 
+                                   snippet.toLowerCase().contains("policy"))) {
+          
+          // Basic Date Extractor
+          final dateRegex = RegExp(r'\b(\d{1,2}[-/\s](?:[a-zA-Z]{3,4}|\d{1,2})[-/\s]\d{2,4})\b');
+          final dateMatch = dateRegex.firstMatch(snippet);
+          String? extractedDateStr = dateMatch?.group(1);
+
+          alerts.add(GmailTextAlert(
+            id: msg.id!,
+            subject: subject,
+            snippet: snippet,
+            extractedDate: extractedDateStr,
+          ));
+        }
+      }
+    } catch (e) {
+      print("❌ Gmail Text Fetch Error: $e");
+    }
+
+    return alerts;
+  }
+}
+
+// 🟢 NEW: Class to hold raw text alerts
+class GmailTextAlert {
+  final String id;
+  final String subject;
+  final String snippet;
+  final String? extractedDate;
+
+  GmailTextAlert({
+    required this.id,
+    required this.subject,
+    required this.snippet,
+    this.extractedDate,
+  });
 }
 
 class BillMetadata {

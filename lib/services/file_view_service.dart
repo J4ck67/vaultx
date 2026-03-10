@@ -19,10 +19,15 @@ class FileViewService {
         throw Exception("File is empty (0 bytes).");
       }
 
-      // 2️⃣ Fix Filename: Ensure it has an extension (Default to .pdf)
+      // 2️⃣ Fix Filename: Ensure it has an extension
       String safeFileName = originalName;
       if (!safeFileName.toLowerCase().contains('.')) {
-        safeFileName = "$safeFileName.pdf";
+        if (storagePath.toLowerCase().endsWith('.jpg') ||
+            storagePath.toLowerCase().endsWith('.jpeg')) {
+          safeFileName = "$safeFileName.jpg";
+        } else {
+          safeFileName = "$safeFileName.pdf";
+        }
       }
 
       // 3️⃣ Get temporary directory and write file
@@ -30,7 +35,6 @@ class FileViewService {
       final file = File('${dir.path}/$safeFileName');
 
       return await file.writeAsBytes(fileBytes);
-
     } catch (e) {
       print("❌ Download Error: $e");
       rethrow; // Pass error back to UI

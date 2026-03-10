@@ -52,11 +52,19 @@ class _StatsScreenState extends State<StatsScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FB),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFDD53F), Colors.white],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             /*──────── 1. HEADER & TIMEFRAME TOGGLE ────────*/
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
@@ -256,6 +264,7 @@ class _StatsScreenState extends State<StatsScreen> {
               ),
             ),
           ],
+        ),
         ),
       ),
     );

@@ -4,7 +4,28 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import '../services/file_view_service.dart';
 import '../services/sms_service.dart';
+import '../services/gmail_service.dart';
+import '../services/notification_service.dart';
 import 'document_preview_screen.dart';
+
+// 🟢 NEW: Unified structure to combine Gmail and SMS alerts in the UI
+class UnifiedAlert {
+  final String id; 
+  final String title;
+  final String subtitle;
+  final String? dateStr;
+  final double? amount;
+  final bool isWarning; // e.g. red for bill, orange for recharge
+
+  UnifiedAlert({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    this.dateStr,
+    this.amount,
+    this.isWarning = false,
+  });
+}
 
 class VaultScreen extends StatefulWidget {
   const VaultScreen({super.key});
@@ -17,7 +38,7 @@ class _VaultScreenState extends State<VaultScreen> {
   String selectedCategory = "All";
   String searchQuery = "";
 
-  late Future<List<SmsReminder>> _smsFuture;
+  late Future<List<UnifiedAlert>> _alertsFuture;
 
   final categories = [
     "All",
@@ -34,11 +55,102 @@ class _VaultScreenState extends State<VaultScreen> {
   @override
   void initState() {
     super.initState();
-    _smsFuture = SmsService.fetchFinancialSms();
+    _initNotifications();
+    _alertsFuture = _fetchAndScheduleAlerts();
+  }
+
+  Future<void> _initNotifications() async {
+    await NotificationService().requestPermissions();
+  }
+
+  // ──────── 🟢 NEW: CONSOLIDATED ALERTS PIPELINE ────────
+  Future<List<UnifiedAlert>> _fetchAndScheduleAlerts() async {
+    List<UnifiedAlert> unifiedList = [];
+    
+    // 1. Fetch from SMS
+    try {
+      final smsList = await SmsService.fetchFinancialSms();
+      for (var sms in smsList) {
+        unifiedList.add(UnifiedAlert(
+          id: 'sms_${sms.id}',
+          title: sms.sender.replaceAll(RegExp(r'[^a-zA-Z0-9]'), ''),
+          subtitle: sms.isRecharge ? "Expiring Soon" : "Payment Due",
+          dateStr: sms.extractedDate,
+          amount: sms.amount,
+          isWarning: !sms.isRecharge,
+        ));
+      }
+    } catch (e) {
+      debugPrint("SMS Fetch Error: $e");
+    }
+
+    // 2. Fetch from Gmail Text
+    try {
+      final gmailAlerts = await GmailService().fetchTextAlerts();
+      for (var email in gmailAlerts) {
+        unifiedList.add(UnifiedAlert(
+          id: 'gmail_${email.id}',
+          title: "Gmail Alert",
+          subtitle: email.subject,
+          dateStr: email.extractedDate,
+          amount: null, // Harder to reliably extract amount from pure emails without LLM
+          isWarning: true,
+        ));
+      }
+    } catch (e) {
+      debugPrint("Gmail Fetch Error: $e");
+    }
+
+    // 3. Smart Scheduling!
+    for (var alert in unifiedList) {
+      if (alert.dateStr != null) {
+        _attemptToSchedulePush(alert);
+      }
+    }
+
+    return unifiedList;
+  }
+
+  // Parses the loose date strings and schedules Native device Push notifications
+  void _attemptToSchedulePush(UnifiedAlert alert) {
+    try {
+      // Very basic date parsing - assumes dd/mm/yyyy or dd-mm-yyyy for now
+      // A more robust implementation would use intl DateFormat extensively
+      final parts = alert.dateStr!.split(RegExp(r'[-/ \.]'));
+      if (parts.length >= 3) {
+        int day = int.tryParse(parts[0]) ?? 1;
+        int month = parts[1].length > 2 ? _parseMonth(parts[1]) : int.tryParse(parts[1]) ?? 1;
+        int year = int.tryParse(parts[2]) ?? DateTime.now().year;
+        if (year < 100) year += 2000;
+
+        // Schedule it for 9:00 AM on the extracted date
+        DateTime targetDate = DateTime(year, month, day, 9, 0);
+
+        // If it's strictly in the future, push to OS!
+        if (targetDate.isAfter(DateTime.now())) {
+            NotificationService().scheduleReminder(
+              id: alert.id.hashCode,
+              title: alert.title,
+              body: "${alert.subtitle} on ${alert.dateStr}!",
+              scheduledTime: targetDate,
+            );
+        }
+      }
+    } catch (e) {
+      debugPrint("Failed to parse/schedule date for ${alert.title}");
+    }
+  }
+
+  int _parseMonth(String m) {
+    final Map<String, int> months = {
+      'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+      'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
+    };
+    return months[m.toLowerCase().substring(0, 3)] ?? 1;
   }
 
   // ──────── 🟢 NEW: HIDE SMS ALERT LOGIC ────────
-  Future<void> _dismissSmsAlert(int smsId) async {
+  Future<void> _dismissSmsAlert(String alertId) async {
     final bool confirm = await showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -51,7 +163,7 @@ class _VaultScreenState extends State<VaultScreen> {
           ],
         ),
         content: const Text(
-          "This will hide the alert from VaultX. (It will not delete the actual SMS from your phone).",
+          "This will hide the alert from VaultX. (It will not delete the actual message from your phone).",
         ),
         actions: [
           TextButton(
@@ -76,14 +188,14 @@ class _VaultScreenState extends State<VaultScreen> {
     if (user == null) return;
 
     try {
-      // Save the hidden SMS ID to the user's profile
+      // Save the hidden Alert ID to the user's profile
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'hidden_sms': FieldValue.arrayUnion([smsId])
+        'hidden_alerts': FieldValue.arrayUnion([alertId])
       }, SetOptions(merge: true));
 
       // Refresh the local UI fetch
       setState(() {
-        _smsFuture = SmsService.fetchFinancialSms();
+        _alertsFuture = _fetchAndScheduleAlerts();
       });
 
       if (!mounted) return;
@@ -91,7 +203,7 @@ class _VaultScreenState extends State<VaultScreen> {
         const SnackBar(content: Text("Alert dismissed."), backgroundColor: Colors.black87),
       );
     } catch (e) {
-      debugPrint("Error hiding SMS: $e");
+      debugPrint("Error hiding alert: $e");
     }
   }
 
@@ -317,34 +429,34 @@ class _VaultScreenState extends State<VaultScreen> {
               const SizedBox(height: 16),
 
 
-              /*──────── 2. 🟢 SMART SMS ALERTS SECTION 🟢 ────────*/
+              /*──────── 2. 🟢 UNIFIED ALERTS CAROUSEL 🟢 ────────*/
               StreamBuilder<DocumentSnapshot>(
                   stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
                   builder: (context, userSnapshot) {
-                    // Get the hidden SMS list from Firestore
-                    List<dynamic> hiddenSmsIds = [];
+                    
+                    List<dynamic> hiddenAlerts = [];
                     if (userSnapshot.hasData && userSnapshot.data!.data() != null) {
                       final userData = userSnapshot.data!.data() as Map<String, dynamic>;
-                      hiddenSmsIds = userData['hidden_sms'] ?? [];
+                      hiddenAlerts = userData['hidden_alerts'] ?? []; // Migrate to generic hidden array
                     }
 
-                    return FutureBuilder<List<SmsReminder>>(
-                      future: _smsFuture,
-                      builder: (context, smsSnapshot) {
-                        if (smsSnapshot.connectionState == ConnectionState.waiting) {
+                    return FutureBuilder<List<UnifiedAlert>>(
+                      future: _alertsFuture,
+                      builder: (context, alertSnapshot) {
+                        if (alertSnapshot.connectionState == ConnectionState.waiting) {
                           return const SizedBox.shrink();
                         }
 
-                        if (!smsSnapshot.hasData || smsSnapshot.data!.isEmpty) {
+                        if (!alertSnapshot.hasData || alertSnapshot.data!.isEmpty) {
                           return const SizedBox.shrink();
                         }
 
                         // 🟢 FILTER OUT THE HIDDEN MESSAGES
-                        final visibleSmsList = smsSnapshot.data!
-                            .where((sms) => !hiddenSmsIds.contains(sms.id))
+                        final visibleAlerts = alertSnapshot.data!
+                            .where((alert) => !hiddenAlerts.contains(alert.id))
                             .toList();
 
-                        if (visibleSmsList.isEmpty) return const SizedBox.shrink();
+                        if (visibleAlerts.isEmpty) return const SizedBox.shrink();
 
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -352,7 +464,7 @@ class _VaultScreenState extends State<VaultScreen> {
                             const Padding(
                               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                               child: Text(
-                                "Smart Alerts (SMS)",
+                                "Smart Inbox Alerts",
                                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
                               ),
                             ),
@@ -362,9 +474,9 @@ class _VaultScreenState extends State<VaultScreen> {
                                 scrollDirection: Axis.horizontal,
                                 physics: const BouncingScrollPhysics(),
                                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                                itemCount: visibleSmsList.length,
+                                itemCount: visibleAlerts.length,
                                 itemBuilder: (context, index) {
-                                  return _buildSmsCard(visibleSmsList[index]);
+                                  return _buildAlertCard(visibleAlerts[index]);
                                 },
                               ),
                             ),
@@ -429,14 +541,15 @@ class _VaultScreenState extends State<VaultScreen> {
 
   // ──────── HELPER WIDGETS ────────
 
-  Widget _buildSmsCard(SmsReminder sms) {
-    final Color themeColor = sms.isRecharge ? Colors.orange : Colors.redAccent;
-    final IconData icon = sms.isRecharge ? Icons.sim_card_rounded : Icons.receipt_long_rounded;
-    final String label = sms.isRecharge ? "Expiring Soon" : "Payment Due";
+  // ──────── HELPER WIDGETS ────────
+
+  Widget _buildAlertCard(UnifiedAlert alert) {
+    final Color themeColor = !alert.isWarning ? Colors.orange : Colors.redAccent;
+    final IconData icon = alert.id.startsWith('gmail') ? Icons.email_rounded : Icons.sim_card_rounded;
 
     // 🟢 WRAPPED IN GESTURE DETECTOR TO LISTEN FOR LONG PRESS
     return GestureDetector(
-      onLongPress: () => _dismissSmsAlert(sms.id),
+      onLongPress: () => _dismissSmsAlert(alert.id),
       child: Container(
         width: 280,
         margin: const EdgeInsets.only(right: 12, bottom: 8),
@@ -469,7 +582,7 @@ class _VaultScreenState extends State<VaultScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    sms.sender.replaceAll(RegExp(r'[^a-zA-Z0-9]'), ''),
+                    alert.title,
                     style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.black),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -482,7 +595,7 @@ class _VaultScreenState extends State<VaultScreen> {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    label,
+                    alert.subtitle,
                     style: TextStyle(fontSize: 9, color: themeColor, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -499,11 +612,11 @@ class _VaultScreenState extends State<VaultScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      sms.isRecharge ? "Recharge Amount" : "Due Amount",
+                      "Alert Trigger",
                       style: TextStyle(fontSize: 10, color: Colors.grey[500], fontWeight: FontWeight.w600),
                     ),
                     Text(
-                      sms.amount != null ? "₹${sms.amount!.toStringAsFixed(0)}" : "Check SMS",
+                      alert.amount != null ? "₹${alert.amount!.toStringAsFixed(0)}" : "Check Inbox",
                       style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.black),
                     ),
                   ],
@@ -512,15 +625,15 @@ class _VaultScreenState extends State<VaultScreen> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      sms.isRecharge ? "Valid Till" : "Due Date",
+                      "Target Date",
                       style: TextStyle(fontSize: 10, color: Colors.grey[500], fontWeight: FontWeight.w600),
                     ),
                     Text(
-                      sms.extractedDate ?? "Action Req.",
+                      alert.dateStr ?? "Action Req.",
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: sms.extractedDate != null ? Colors.black87 : Colors.red,
+                        color: alert.dateStr != null ? Colors.black87 : Colors.red,
                       ),
                     ),
                   ],

@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vaultx/screens/app_shell.dart';
+import 'package:vaultx/services/notification_service.dart';
 
 
 import 'firebase_options.dart';
@@ -15,8 +16,10 @@ void main() async {
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
-
   );
+
+  // Initialize Local Push Notifications Server
+  await NotificationService().init();
 
   final prefs = await SharedPreferences.getInstance();
   final seenOnboarding = prefs.getBool('seenOnboarding') ?? false;

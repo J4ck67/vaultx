@@ -11,10 +11,11 @@ class VaultXBottomNav extends StatelessWidget {
     required this.onTap,
   });
 
-  // 🔴 REMOVED THE "ADD" BUTTON. NOW IT HAS 4 ITEMS.
+  // 🔴 REMOVED THE "ADD" BUTTON. NOW IT HAS 5 ITEMS.
   static const _items = [
     _NavItem(Icons.home_rounded, "Home"),
     _NavItem(Icons.folder_rounded, "Vault"),
+    _NavItem(Icons.health_and_safety_rounded, "Policy"),
     _NavItem(Icons.bar_chart_rounded, "Stats"),
     _NavItem(Icons.person_rounded, "Profile"),
   ];

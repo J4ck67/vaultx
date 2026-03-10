@@ -1,6 +1,6 @@
 name: vaultx
 description: "A new Flutter project."
-publish_to: 'none'
+publish_to: "none"
 
 version: 1.0.0+1
 
@@ -41,12 +41,12 @@ dependencies:
   permission_handler: ^11.3.0
   fl_chart: ^0.66.0
   http: ^1.2.0
-
-
-
-
-
-
+  pdfx: ^2.6.0
+  flutter_image_compress: ^2.1.0
+  mime: ^1.0.4
+  image: ^4.1.7
+  flutter_local_notifications: ^21.0.0
+  timezone: ^0.11.0
 
 
 

@@ -4,6 +4,7 @@ import 'package:vaultx/screens/stats_screen.dart';
 import 'package:vaultx/screens/vault_screen.dart';
 import '../widgets/bottom_nav.dart';
 import 'home_screen.dart';
+import 'insurance_prediction_screen.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -15,10 +16,11 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int index = 0;
 
-  // 🔴 MATCHES THE 4 BUTTONS IN THE NAV BAR
+  // 🔴 MATCHES THE 5 BUTTONS IN THE NAV BAR
   final pages = const [
     HomeScreen(),
     VaultScreen(),
+    InsurancePredictionScreen(),
     StatsScreen(),
     ProfileScreen(),
   ];

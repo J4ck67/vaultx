@@ -31,10 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFFDD53F),
-              Color(0xFFFFFFFF),
-            ],
+            colors: [Color(0xFFFDD53F), Color(0xFFFFFFFF)],
           ),
         ),
         child: SafeArea(
@@ -73,8 +70,11 @@ class _HomeScreenState extends State<HomeScreen> {
                             ? NetworkImage(user!.photoURL!)
                             : null,
                         child: user?.photoURL == null
-                            ? const Icon(Icons.person,
-                            size: 18, color: Colors.white)
+                            ? const Icon(
+                                Icons.person,
+                                size: 18,
+                                color: Colors.white,
+                              )
                             : null,
                       ),
                     ),
@@ -129,11 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         amount: "₹95",
                         days: 3,
                       ),
-                      _UpcomingCard(
-                        title: "Rent",
-                        amount: "₹1,000",
-                        days: 5,
-                      ),
+                      _UpcomingCard(title: "Rent", amount: "₹1,000", days: 5),
                     ],
                   ),
                 ),
@@ -165,19 +161,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [0.4, 0.8, 0.6, 1.0, 0.7]
                         .map(
                           (v) => Expanded(
-                        child: Padding(
-                          padding:
-                          const EdgeInsets.symmetric(horizontal: 4),
-                          child: Container(
-                            height: 80 * v,
-                            decoration: BoxDecoration(
-                              color: Colors.amber,
-                              borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
+                              child: Container(
+                                height: 80 * v,
+                                decoration: BoxDecoration(
+                                  color: Colors.amber,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                    )
+                        )
                         .toList(),
                   ),
                 ),
@@ -199,7 +196,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       onTap: () => setState(() => selectedCategory = c),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(20),
                           color: selected
@@ -211,8 +210,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           c,
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            color:
-                            selected ? Colors.black : Colors.black54,
+                            color: selected ? Colors.black : Colors.black54,
                           ),
                         ),
                       ),
@@ -230,7 +228,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 12),
 
                 ...recentDocs.map(
-                      (doc) => Container(
+                  (doc) => Container(
                     margin: const EdgeInsets.only(bottom: 10),
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
@@ -245,20 +243,23 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.insert_drive_file,
-                            color: Colors.amber),
+                        const Icon(
+                          Icons.insert_drive_file,
+                          color: Colors.amber,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             doc["name"]!,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600),
+                            style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                         ),
                         Text(
                           doc["date"]!,
                           style: const TextStyle(
-                              fontSize: 12, color: Colors.black54),
+                            fontSize: 12,
+                            color: Colors.black54,
+                          ),
                         ),
                       ],
                     ),
@@ -292,11 +293,11 @@ class _HomeScreenState extends State<HomeScreen> {
             CircleAvatar(
               radius: 36,
               backgroundColor: Colors.black,
-              backgroundImage:
-              user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
+              backgroundImage: user?.photoURL != null
+                  ? NetworkImage(user!.photoURL!)
+                  : null,
               child: user?.photoURL == null
-                  ? const Icon(Icons.person,
-                  size: 36, color: Colors.white)
+                  ? const Icon(Icons.person, size: 36, color: Colors.white)
                   : null,
             ),
 
@@ -304,8 +305,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             Text(
               user?.displayName ?? "VaultX User",
-              style:
-              const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
 
             const SizedBox(height: 4),
@@ -355,8 +355,7 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Text(label, style: const TextStyle(color: Colors.black54)),
           const Spacer(),
-          Text(value,
-              style: const TextStyle(fontWeight: FontWeight.w600)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -397,10 +396,7 @@ class _UpcomingCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           color: Colors.white,
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 16,
-            ),
+            BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16),
           ],
         ),
         child: Column(
@@ -408,13 +404,16 @@ class _UpcomingCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text(title,
-                    style:
-                    const TextStyle(fontWeight: FontWeight.w600)),
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
                 const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 6),
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
                     color: days <= 3
@@ -434,10 +433,7 @@ class _UpcomingCard extends StatelessWidget {
             const Spacer(),
             Text(
               amount,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -455,7 +451,12 @@ class _UploadButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return FloatingActionButton(
       backgroundColor: Colors.black,
-      onPressed: () {Navigator.push(context, MaterialPageRoute(builder: (_) => UploadBillButton()));},
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => UploadBillButton()),
+        );
+      },
       child: const Icon(Icons.add, color: Colors.white),
     );
   }
